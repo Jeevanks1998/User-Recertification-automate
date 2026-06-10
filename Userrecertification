@@ -1,21 +1,23 @@
 function main(workbook: ExcelScript.Workbook) {
   const sheet = workbook.getActiveWorksheet();
 
-  // Step 1: Delete columns in reverse order (B, C, E, F)
-  sheet.getColumn(5).delete();
-  sheet.getColumn(4).delete();
-  sheet.getColumn(2).delete();
-  sheet.getColumn(1).delete();
+  // Step 1: Delete columns using column letters (right to left)
+  sheet.getRange("F:F").delete(ExcelScript.DeleteShiftDirection.left);
+  sheet.getRange("E:E").delete(ExcelScript.DeleteShiftDirection.left);
+  sheet.getRange("C:C").delete(ExcelScript.DeleteShiftDirection.left);
+  sheet.getRange("B:B").delete(ExcelScript.DeleteShiftDirection.left);
 
-  // Step 2: Add "Access" header in column E
+  // Now: A=Name, B=Email, C=Permissions, D=User Status
+
+  // Step 2: Add Access header in column E
   const lastRow: number = sheet.getUsedRange().getRowCount();
   sheet.getRange("E1").setValue("Access");
   sheet.getRange("E1").getFormat().getFont().setBold(true);
   sheet.getRange("E1").getFormat().getFill().setColor("#1F7391");
   sheet.getRange("E1").getFormat().getFont().setColor("#FFFFFF");
 
-  // Step 3: Add dropdown validation
-  const accessRange: ExcelScript.Range = sheet.getRange(`E2:E${lastRow}`);
+  // Step 3: Dropdown on E2 to last row
+  const accessRange: ExcelScript.Range = sheet.getRange("E2:E" + lastRow);
   const validation: ExcelScript.DataValidation = accessRange.getDataValidation();
   validation.setRule({
     list: {
@@ -24,10 +26,10 @@ function main(workbook: ExcelScript.Workbook) {
     }
   });
 
-  // Step 4: Retain = Green
-  const retainFormat: ExcelScript.ConditionalFormat = sheet.addConditionalFormat(
-    ExcelScript.ConditionalFormatType.containsText
-  );
+  // Step 4: Conditional formatting — called on Range, not sheet
+  // Retain = Green
+  const retainFormat: ExcelScript.ConditionalFormat = 
+    accessRange.addConditionalFormat(ExcelScript.ConditionalFormatType.containsText);
   retainFormat.getTextComparison().setRule({
     operator: ExcelScript.ConditionalTextOperator.contains,
     text: "Retain"
@@ -35,12 +37,10 @@ function main(workbook: ExcelScript.Workbook) {
   retainFormat.getTextComparison().getFormat().getFill().setColor("#92D050");
   retainFormat.getTextComparison().getFormat().getFont().setColor("#1A4D00");
   retainFormat.getTextComparison().getFormat().getFont().setBold(true);
-  retainFormat.setRanges(accessRange);
 
-  // Step 5: Delete = Red
-  const deleteFormat: ExcelScript.ConditionalFormat = sheet.addConditionalFormat(
-    ExcelScript.ConditionalFormatType.containsText
-  );
+  // Delete = Red
+  const deleteFormat: ExcelScript.ConditionalFormat = 
+    accessRange.addConditionalFormat(ExcelScript.ConditionalFormatType.containsText);
   deleteFormat.getTextComparison().setRule({
     operator: ExcelScript.ConditionalTextOperator.contains,
     text: "Delete"
@@ -48,12 +48,10 @@ function main(workbook: ExcelScript.Workbook) {
   deleteFormat.getTextComparison().getFormat().getFill().setColor("#FF0000");
   deleteFormat.getTextComparison().getFormat().getFont().setColor("#FFFFFF");
   deleteFormat.getTextComparison().getFormat().getFont().setBold(true);
-  deleteFormat.setRanges(accessRange);
 
-  // Step 6: New = Blue
-  const newFormat: ExcelScript.ConditionalFormat = sheet.addConditionalFormat(
-    ExcelScript.ConditionalFormatType.containsText
-  );
+  // New = Blue
+  const newFormat: ExcelScript.ConditionalFormat = 
+    accessRange.addConditionalFormat(ExcelScript.ConditionalFormatType.containsText);
   newFormat.getTextComparison().setRule({
     operator: ExcelScript.ConditionalTextOperator.contains,
     text: "New"
@@ -61,5 +59,4 @@ function main(workbook: ExcelScript.Workbook) {
   newFormat.getTextComparison().getFormat().getFill().setColor("#00B0F0");
   newFormat.getTextComparison().getFormat().getFont().setColor("#FFFFFF");
   newFormat.getTextComparison().getFormat().getFont().setBold(true);
-  newFormat.setRanges(accessRange);
 }
