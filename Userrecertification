@@ -9,15 +9,64 @@ function main(workbook: ExcelScript.Workbook) {
 
   // Now: A=Name, B=Email, C=Permissions, D=User Status
 
-  // Step 2: Add Access header in column E
   const lastRow: number = sheet.getUsedRange().getRowCount();
+
+  // Step 2: Style the header row A1:E1
+  const headerRange: ExcelScript.Range = sheet.getRange("A1:E1");
+  headerRange.getFormat().getFill().setColor("#1F7391");
+  headerRange.getFormat().getFont().setColor("#FFFFFF");
+  headerRange.getFormat().getFont().setBold(true);
+  headerRange.getFormat().getFont().setName("Arial");
+  headerRange.getFormat().setHorizontalAlignment(ExcelScript.HorizontalAlignment.center);
+
+  // Step 3: Style the data rows A2:D with alternating rows
+  for (let i = 2; i <= lastRow; i++) {
+    const rowRange: ExcelScript.Range = sheet.getRange(A${i}:D${i});
+    rowRange.getFormat().getFont().setName("Arial");
+    rowRange.getFormat().getFont().setSize(10);
+    if (i % 2 === 0) {
+      rowRange.getFormat().getFill().setColor("#F2F8FB");
+    } else {
+      rowRange.getFormat().getFill().setColor("#FFFFFF");
+    }
+  }
+
+  // Step 4: Add borders to full table A1:E{lastRow}
+  const tableRange: ExcelScript.Range = sheet.getRange(A1:E${lastRow});
+  const borderStyles: ExcelScript.BorderIndex[] = [
+    ExcelScript.BorderIndex.edgeTop,
+    ExcelScript.BorderIndex.edgeBottom,
+    ExcelScript.BorderIndex.edgeLeft,
+    ExcelScript.BorderIndex.edgeRight,
+    ExcelScript.BorderIndex.insideHorizontal,
+    ExcelScript.BorderIndex.insideVertical
+  ];
+  for (const border of borderStyles) {
+    tableRange.getFormat().getRangeBorder(border).setStyle(ExcelScript.BorderLineStyle.thin);
+    tableRange.getFormat().getRangeBorder(border).setColor("#D3D3D3");
+  }
+
+  // Step 5: Auto-fit columns
+  sheet.getRange("A:E").getFormat().autofitColumns();
+
+  // Step 6: Add Access header in E1
   sheet.getRange("E1").setValue("Access");
-  sheet.getRange("E1").getFormat().getFont().setBold(true);
   sheet.getRange("E1").getFormat().getFill().setColor("#1F7391");
   sheet.getRange("E1").getFormat().getFont().setColor("#FFFFFF");
+  sheet.getRange("E1").getFormat().getFont().setBold(true);
 
-  // Step 3: Dropdown on E2 to last row
-  const accessRange: ExcelScript.Range = sheet.getRange("E2:E" + lastRow);
+  // Step 7: Auto-fill Access column — @axa.com = Retain, others blank
+  for (let i = 2; i <= lastRow; i++) {
+    const emailCell: ExcelScript.Range = sheet.getRange(B${i});
+    const email: string = emailCell.getValue() as string;
+    const accessCell: ExcelScript.Range = sheet.getRange(E${i});
+    if (email && email.toLowerCase().includes("@axa.com")) {
+      accessCell.setValue("Retain");
+    }
+  }
+
+  // Step 8: Dropdown on E2:E{lastRow}
+  const accessRange: ExcelScript.Range = sheet.getRange(E2:E${lastRow});
   const validation: ExcelScript.DataValidation = accessRange.getDataValidation();
   validation.setRule({
     list: {
@@ -26,9 +75,9 @@ function main(workbook: ExcelScript.Workbook) {
     }
   });
 
-  // Step 4: Conditional formatting — called on Range, not sheet
+  // Step 9: Conditional formatting on access column
   // Retain = Green
-  const retainFormat: ExcelScript.ConditionalFormat = 
+  const retainFormat: ExcelScript.ConditionalFormat =
     accessRange.addConditionalFormat(ExcelScript.ConditionalFormatType.containsText);
   retainFormat.getTextComparison().setRule({
     operator: ExcelScript.ConditionalTextOperator.contains,
@@ -39,7 +88,7 @@ function main(workbook: ExcelScript.Workbook) {
   retainFormat.getTextComparison().getFormat().getFont().setBold(true);
 
   // Delete = Red
-  const deleteFormat: ExcelScript.ConditionalFormat = 
+  const deleteFormat: ExcelScript.ConditionalFormat =
     accessRange.addConditionalFormat(ExcelScript.ConditionalFormatType.containsText);
   deleteFormat.getTextComparison().setRule({
     operator: ExcelScript.ConditionalTextOperator.contains,
@@ -50,7 +99,7 @@ function main(workbook: ExcelScript.Workbook) {
   deleteFormat.getTextComparison().getFormat().getFont().setBold(true);
 
   // New = Blue
-  const newFormat: ExcelScript.ConditionalFormat = 
+  const newFormat: ExcelScript.ConditionalFormat =
     accessRange.addConditionalFormat(ExcelScript.ConditionalFormatType.containsText);
   newFormat.getTextComparison().setRule({
     operator: ExcelScript.ConditionalTextOperator.contains,
@@ -59,4 +108,7 @@ function main(workbook: ExcelScript.Workbook) {
   newFormat.getTextComparison().getFormat().getFill().setColor("#00B0F0");
   newFormat.getTextComparison().getFormat().getFont().setColor("#FFFFFF");
   newFormat.getTextComparison().getFormat().getFont().setBold(true);
+
+  // Step 10: Freeze header row
+  sheet.getFreezePanes().freezeRows(1);
 }
