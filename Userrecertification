@@ -1,20 +1,23 @@
 function main(workbook: ExcelScript.Workbook) {
   const sheet = workbook.getActiveWorksheet();
 
-  // Step 1: Delete ONLY unwanted columns (right to left to preserve indices)
-  // Keep: A=Name, B=Email, C=Permissions, D=User Status
-  // Delete only truly unwanted columns (F and E if they are blank/extra)
-  // Adjust these based on your raw export columns:
-  sheet.getRange("F:F").delete(ExcelScript.DeleteShiftDirection.left);
+  // Delete unwanted columns RIGHT TO LEFT to preserve indices
+  // Original columns: A=Name, B=Is a group, C=Violates user policy, D=Email,
+  //                   E=Is secondary email, F=Is an organisation administrator,
+  //                   G=Permissions, H=User status
+  sheet.getRange("F:F").delete(ExcelScript.DeleteShiftDirection.left); // Is an organisation administrator
+  sheet.getRange("E:E").delete(ExcelScript.DeleteShiftDirection.left); // Is secondary email
+  sheet.getRange("C:C").delete(ExcelScript.DeleteShiftDirection.left); // Violates user policy
+  sheet.getRange("B:B").delete(ExcelScript.DeleteShiftDirection.left); // Is a group
 
-  // Now columns should be: A=Name, B=Email, C=Permissions, D=User Status
+  // Now columns are: A=Name, B=Email, C=Permissions, D=User Status
+
   const lastRow: number = sheet.getUsedRange().getRowCount();
-  const accessCol: string = "E";
-  const accessStart: string = accessCol + "2";
-  const accessEnd: string = accessCol + lastRow;
-  const lastCell: string = accessCol + lastRow;
+  const accessStart: string = "E2";
+  const accessEnd: string = "E" + lastRow;
+  const lastCell: string = "E" + lastRow;
 
-  // Step 2: Style header A1:E1
+  // Style header A1:E1
   const headerRange: ExcelScript.Range = sheet.getRange("A1:E1");
   headerRange.getFormat().getFill().setColor("#1F7391");
   headerRange.getFormat().getFont().setColor("#FFFFFF");
@@ -24,10 +27,10 @@ function main(workbook: ExcelScript.Workbook) {
     ExcelScript.HorizontalAlignment.center
   );
 
-  // Step 3: Add Access header in E1
+  // Add Access header
   sheet.getRange("E1").setValue("Access");
 
-  // Step 4: All data rows A:D = pure WHITE background, Arial 10
+  // All data rows A:D = pure WHITE, Arial 10, black text
   for (let i = 2; i <= lastRow; i++) {
     const rowRange: ExcelScript.Range = sheet.getRange("A" + i + ":D" + i);
     rowRange.getFormat().getFill().setColor("#FFFFFF");
@@ -36,7 +39,7 @@ function main(workbook: ExcelScript.Workbook) {
     rowRange.getFormat().getFont().setColor("#000000");
   }
 
-  // Step 5: Borders on full table A1:E{lastRow}
+  // Borders on full table A1:E{lastRow}
   const tableRange: ExcelScript.Range = sheet.getRange("A1:" + lastCell);
   const borders: ExcelScript.BorderIndex[] = [
     ExcelScript.BorderIndex.edgeTop,
@@ -53,75 +56,64 @@ function main(workbook: ExcelScript.Workbook) {
     tableRange.getFormat().getRangeBorder(b).setColor("#D3D3D3");
   }
 
-  // Step 6: Auto-fit columns
+  // Auto-fit columns
   sheet.getRange("A:E").getFormat().autofitColumns();
 
-  // Step 7: Read emails from column B, fill Access column E
+  // Read emails from column B, fill Access column E
+  // @axa.com emails → Retain, others → blank
   const emailData: string[][] = sheet.getRange("B2:B" + lastRow)
     .getValues() as string[][];
   const accessValues: string[][] = [];
   for (let i = 0; i < emailData.length; i++) {
     const email: string = emailData[i][0] ? emailData[i][0].toString() : "";
-    if (email.toLowerCase().indexOf("@axa.com") !== -1) {
-      accessValues.push(["Retain"]);
-    } else {
-      accessValues.push([""]);
-    }
+    accessValues.push(
+      email.toLowerCase().indexOf("@axa.com") !== -1 ? ["Retain"] : [""]
+    );
   }
   sheet.getRange(accessStart + ":" + accessEnd).setValues(accessValues);
 
-  // Step 8: Dropdown validation on Access column
+  // Dropdown validation on Access column
   const accessRange: ExcelScript.Range = sheet.getRange(
     accessStart + ":" + accessEnd
   );
-  const validation: ExcelScript.DataValidation = accessRange.getDataValidation();
-  validation.setRule({
-    list: {
-      inCellDropDown: true,
-      source: "Retain,Delete,New"
-    }
+  accessRange.getDataValidation().setRule({
+    list: { inCellDropDown: true, source: "Retain,Delete,New" }
   });
 
-  // Step 9: Conditional formatting ONLY on Access column (E)
+  // Conditional formatting — Access column ONLY
   // Retain = Green
-  const retainFormat: ExcelScript.ConditionalFormat =
-    accessRange.addConditionalFormat(
-      ExcelScript.ConditionalFormatType.containsText
-    );
-  retainFormat.getTextComparison().setRule({
+  const retainFmt: ExcelScript.ConditionalFormat =
+    accessRange.addConditionalFormat(ExcelScript.ConditionalFormatType.containsText);
+  retainFmt.getTextComparison().setRule({
     operator: ExcelScript.ConditionalTextOperator.contains,
     text: "Retain"
   });
-  retainFormat.getTextComparison().getFormat().getFill().setColor("#92D050");
-  retainFormat.getTextComparison().getFormat().getFont().setColor("#1A4D00");
-  retainFormat.getTextComparison().getFormat().getFont().setBold(true);
+  retainFmt.getTextComparison().getFormat().getFill().setColor("#92D050");
+  retainFmt.getTextComparison().getFormat().getFont().setColor("#1A4D00");
+  retainFmt.getTextComparison().getFormat().getFont().setBold(true);
 
   // Delete = Red
-  const deleteFormat: ExcelScript.ConditionalFormat =
-    accessRange.addConditionalFormat(
-      ExcelScript.ConditionalFormatType.containsText
-    );
-  deleteFormat.getTextComparison().setRule({
+  const deleteFmt: ExcelScript.ConditionalFormat =
+    accessRange.addConditionalFormat(ExcelScript.ConditionalFormatType.containsText);
+  deleteFmt.getTextComparison().setRule({
     operator: ExcelScript.ConditionalTextOperator.contains,
     text: "Delete"
   });
-  deleteFormat.getTextComparison().getFormat().getFill().setColor("#FF0000");
-  deleteFormat.getTextComparison().getFormat().getFont().setColor("#FFFFFF");
-  deleteFormat.getTextComparison().getFormat().getFont().setBold(true);
+  deleteFmt.getTextComparison().getFormat().getFill().setColor("#FF0000");
+  deleteFmt.getTextComparison().getFormat().getFont().setColor("#FFFFFF");
+  deleteFmt.getTextComparison().getFormat().getFont().setBold(true);
 
   // New = Blue
-  const newFormat: ExcelScript.ConditionalFormat =
-    accessRange.addConditionalFormat(
-      ExcelScript.ConditionalFormatType.containsText
-    );
-  newFormat.getTextComparison().setRule({
+  const newFmt: ExcelScript.ConditionalFormat =
+    accessRange.addConditionalFormat(ExcelScript.ConditionalFormatType.containsText);
+  newFmt.getTextComparison().setRule({
     operator: ExcelScript.ConditionalTextOperator.contains,
     text: "New"
   });
-  newFormat.getTextComparison().getFormat().getFill().setColor("#00B0F0");
-  newFormat.getTextComparison().getFormat().getFont().setColor("#FFFFFF");
-  newFormat.getTextComparison().getFormat().getFont().setBold(true);
+  newFmt.getTextComparison().getFormat().getFill().setColor("#00B0F0");
+  newFmt.getTextComparison().getFormat().getFont().setColor("#FFFFFF");
+  newFmt.getTextComparison().getFormat().getFont().setBold(true);
 
-  // Step 10: Freeze header row
+  // Freeze header row
   sheet.getFreezePanes().freezeRows(1);
 }
