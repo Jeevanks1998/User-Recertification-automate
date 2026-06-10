@@ -1,18 +1,18 @@
 function main(workbook: ExcelScript.Workbook) {
   const sheet = workbook.getActiveWorksheet();
 
-  // Step 1: Delete columns right to left
+  // Step 1: Delete ONLY unwanted columns (right to left to preserve indices)
+  // Keep: A=Name, B=Email, C=Permissions, D=User Status
+  // Delete only truly unwanted columns (F and E if they are blank/extra)
+  // Adjust these based on your raw export columns:
   sheet.getRange("F:F").delete(ExcelScript.DeleteShiftDirection.left);
-  sheet.getRange("E:E").delete(ExcelScript.DeleteShiftDirection.left);
-  sheet.getRange("C:C").delete(ExcelScript.DeleteShiftDirection.left);
-  sheet.getRange("B:B").delete(ExcelScript.DeleteShiftDirection.left);
 
-  // Now: A=Name, B=Email, C=Permissions, D=User Status
+  // Now columns should be: A=Name, B=Email, C=Permissions, D=User Status
   const lastRow: number = sheet.getUsedRange().getRowCount();
-  const lastCell: string = "E" + lastRow;
-  const dataLastCell: string = "D" + lastRow;
-  const accessStart: string = "E2";
-  const accessEnd: string = "E" + lastRow;
+  const accessCol: string = "E";
+  const accessStart: string = accessCol + "2";
+  const accessEnd: string = accessCol + lastRow;
+  const lastCell: string = accessCol + lastRow;
 
   // Step 2: Style header A1:E1
   const headerRange: ExcelScript.Range = sheet.getRange("A1:E1");
@@ -24,22 +24,19 @@ function main(workbook: ExcelScript.Workbook) {
     ExcelScript.HorizontalAlignment.center
   );
 
-  // Step 3: Add Access header
+  // Step 3: Add Access header in E1
   sheet.getRange("E1").setValue("Access");
 
-  // Step 4: Alternating row colors for data rows
+  // Step 4: All data rows A:D = pure WHITE background, Arial 10
   for (let i = 2; i <= lastRow; i++) {
     const rowRange: ExcelScript.Range = sheet.getRange("A" + i + ":D" + i);
+    rowRange.getFormat().getFill().setColor("#FFFFFF");
     rowRange.getFormat().getFont().setName("Arial");
     rowRange.getFormat().getFont().setSize(10);
-    if (i % 2 === 0) {
-      rowRange.getFormat().getFill().setColor("#F2F8FB");
-    } else {
-      rowRange.getFormat().getFill().setColor("#FFFFFF");
-    }
+    rowRange.getFormat().getFont().setColor("#000000");
   }
 
-  // Step 5: Borders on full table
+  // Step 5: Borders on full table A1:E{lastRow}
   const tableRange: ExcelScript.Range = sheet.getRange("A1:" + lastCell);
   const borders: ExcelScript.BorderIndex[] = [
     ExcelScript.BorderIndex.edgeTop,
@@ -59,7 +56,7 @@ function main(workbook: ExcelScript.Workbook) {
   // Step 6: Auto-fit columns
   sheet.getRange("A:E").getFormat().autofitColumns();
 
-  // Step 7: Read all emails at once, fill Access column
+  // Step 7: Read emails from column B, fill Access column E
   const emailData: string[][] = sheet.getRange("B2:B" + lastRow)
     .getValues() as string[][];
   const accessValues: string[][] = [];
@@ -73,7 +70,7 @@ function main(workbook: ExcelScript.Workbook) {
   }
   sheet.getRange(accessStart + ":" + accessEnd).setValues(accessValues);
 
-  // Step 8: Dropdown validation
+  // Step 8: Dropdown validation on Access column
   const accessRange: ExcelScript.Range = sheet.getRange(
     accessStart + ":" + accessEnd
   );
@@ -85,7 +82,7 @@ function main(workbook: ExcelScript.Workbook) {
     }
   });
 
-  // Step 9: Conditional formatting on access range
+  // Step 9: Conditional formatting ONLY on Access column (E)
   // Retain = Green
   const retainFormat: ExcelScript.ConditionalFormat =
     accessRange.addConditionalFormat(
@@ -125,6 +122,6 @@ function main(workbook: ExcelScript.Workbook) {
   newFormat.getTextComparison().getFormat().getFont().setColor("#FFFFFF");
   newFormat.getTextComparison().getFormat().getFont().setBold(true);
 
-  // Step 10: Freeze header
+  // Step 10: Freeze header row
   sheet.getFreezePanes().freezeRows(1);
 }
