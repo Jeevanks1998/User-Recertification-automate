@@ -6,22 +6,23 @@ function main(workbook: ExcelScript.Workbook) {
   // E=Account Role, F=Container Role
   // G=Access (new column to add)
 
-  // ✅ STEP 1: Remove duplicates based on Email (D) + Container ID (C) COMBINED
-  // This keeps rows where the same person has different containers
+  // ✅ STEP 1: Remove duplicates based on Account Name (A) + User Email (D)
+  // Same person appearing multiple times in the same account = duplicate
+  // Different accounts = keep both rows
   const totalRows: number = sheet.getUsedRange().getRowCount();
   const seenKeys: Set<string> = new Set<string>();
   const rowsToDelete: number[] = [];
 
   for (let i = totalRows; i >= 2; i--) {
+    const accountVal = sheet.getRange("A" + i).getValue();
     const emailVal = sheet.getRange("D" + i).getValue();
-    const containerVal = sheet.getRange("C" + i).getValue();
+    const account: string = accountVal ? accountVal.toString().toLowerCase().trim() : "";
     const email: string = emailVal ? emailVal.toString().toLowerCase().trim() : "";
-    const container: string = containerVal ? containerVal.toString().trim() : "";
-    const key: string = email + "|" + container; // unique combo key
+    const key: string = account + "|" + email; // unique combo: Account + Email
     if (seenKeys.has(key)) {
-      rowsToDelete.push(i);
+      rowsToDelete.push(i); // mark as duplicate
     } else {
-      seenKeys.add(key);
+      seenKeys.add(key); // first occurrence, keep it
     }
   }
 
@@ -79,6 +80,7 @@ function main(workbook: ExcelScript.Workbook) {
   sheet.getRange("A:G").getFormat().autofitColumns();
 
   // Read emails from column D, fill Access column G
+  // @axa.com, @jellyfish.com, @heaviside.fr → Retain, others → blank
   const emailData: string[][] = sheet.getRange("D2:D" + lastRow)
     .getValues() as string[][];
   const accessValues: string[][] = [];
