@@ -1,27 +1,31 @@
 function main(workbook: ExcelScript.Workbook) {
   const sheet = workbook.getActiveWorksheet();
 
-  // All 6 original columns are kept:
+  // All 6 original columns:
   // A=Account Name, B=Account ID, C=Container ID, D=User Email,
   // E=Account Role, F=Container Role
   // G=Access (new column to add)
 
-  // ✅ STEP 1: Remove duplicate rows based on User Email (column D)
+  // ✅ STEP 1: Remove duplicates based on Email (D) + Container ID (C) COMBINED
+  // This keeps rows where the same person has different containers
   const totalRows: number = sheet.getUsedRange().getRowCount();
-  const seenEmails: Set<string> = new Set<string>();
+  const seenKeys: Set<string> = new Set<string>();
   const rowsToDelete: number[] = [];
 
   for (let i = totalRows; i >= 2; i--) {
-    const emailCell = sheet.getRange("D" + i).getValue();
-    const email: string = emailCell ? emailCell.toString().toLowerCase().trim() : "";
-    if (seenEmails.has(email)) {
+    const emailVal = sheet.getRange("D" + i).getValue();
+    const containerVal = sheet.getRange("C" + i).getValue();
+    const email: string = emailVal ? emailVal.toString().toLowerCase().trim() : "";
+    const container: string = containerVal ? containerVal.toString().trim() : "";
+    const key: string = email + "|" + container; // unique combo key
+    if (seenKeys.has(key)) {
       rowsToDelete.push(i);
     } else {
-      seenEmails.add(email);
+      seenKeys.add(key);
     }
   }
 
-  // Delete duplicate rows (already in reverse order so indices stay valid)
+  // Delete duplicate rows (reverse order keeps indices valid)
   for (const rowNum of rowsToDelete) {
     sheet.getRange(rowNum + ":" + rowNum).delete(ExcelScript.DeleteShiftDirection.up);
   }
@@ -75,7 +79,6 @@ function main(workbook: ExcelScript.Workbook) {
   sheet.getRange("A:G").getFormat().autofitColumns();
 
   // Read emails from column D, fill Access column G
-  // @axa.com, @jellyfish.com, @heaviside.fr → Retain, others → blank
   const emailData: string[][] = sheet.getRange("D2:D" + lastRow)
     .getValues() as string[][];
   const accessValues: string[][] = [];
