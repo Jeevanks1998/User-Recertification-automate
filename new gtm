@@ -1,0 +1,142 @@
+function main(workbook: ExcelScript.Workbook) {
+  const sheet = workbook.getActiveWorksheet();
+
+  // All 6 original columns are kept:
+  // A=Account Name, B=Account ID, C=Container ID, D=User Email,
+  // E=Account Role, F=Container Role
+  // G=Access (new column to add)
+
+  // ✅ STEP 1: Remove duplicate rows based on User Email (column D)
+  const totalRows: number = sheet.getUsedRange().getRowCount();
+  const seenEmails: Set<string> = new Set<string>();
+  const rowsToDelete: number[] = [];
+
+  for (let i = totalRows; i >= 2; i--) {
+    const emailCell = sheet.getRange("D" + i).getValue();
+    const email: string = emailCell ? emailCell.toString().toLowerCase().trim() : "";
+    if (seenEmails.has(email)) {
+      rowsToDelete.push(i);
+    } else {
+      seenEmails.add(email);
+    }
+  }
+
+  // Delete duplicate rows (already in reverse order so indices stay valid)
+  for (const rowNum of rowsToDelete) {
+    sheet.getRange(rowNum + ":" + rowNum).delete(ExcelScript.DeleteShiftDirection.up);
+  }
+
+  // Recalculate lastRow after deletions
+  const lastRow: number = sheet.getUsedRange().getRowCount();
+  const accessStart: string = "G2";
+  const accessEnd: string = "G" + lastRow;
+  const lastCell: string = "G" + lastRow;
+
+  // Style header A1:G1
+  const headerRange: ExcelScript.Range = sheet.getRange("A1:G1");
+  headerRange.getFormat().getFill().setColor("#1F7391");
+  headerRange.getFormat().getFont().setColor("#FFFFFF");
+  headerRange.getFormat().getFont().setBold(true);
+  headerRange.getFormat().getFont().setName("Arial");
+  headerRange.getFormat().setHorizontalAlignment(
+    ExcelScript.HorizontalAlignment.center
+  );
+
+  // Add Access header in G1
+  sheet.getRange("G1").setValue("Access");
+
+  // All data rows A:F = pure WHITE, Arial 10, black text
+  for (let i = 2; i <= lastRow; i++) {
+    const rowRange: ExcelScript.Range = sheet.getRange("A" + i + ":F" + i);
+    rowRange.getFormat().getFill().setColor("#FFFFFF");
+    rowRange.getFormat().getFont().setName("Arial");
+    rowRange.getFormat().getFont().setSize(10);
+    rowRange.getFormat().getFont().setColor("#000000");
+  }
+
+  // Borders on full table A1:G{lastRow}
+  const tableRange: ExcelScript.Range = sheet.getRange("A1:" + lastCell);
+  const borders: ExcelScript.BorderIndex[] = [
+    ExcelScript.BorderIndex.edgeTop,
+    ExcelScript.BorderIndex.edgeBottom,
+    ExcelScript.BorderIndex.edgeLeft,
+    ExcelScript.BorderIndex.edgeRight,
+    ExcelScript.BorderIndex.insideHorizontal,
+    ExcelScript.BorderIndex.insideVertical
+  ];
+  for (const b of borders) {
+    tableRange.getFormat().getRangeBorder(b).setStyle(
+      ExcelScript.BorderLineStyle.continuous
+    );
+    tableRange.getFormat().getRangeBorder(b).setColor("#D3D3D3");
+  }
+
+  // Auto-fit all columns
+  sheet.getRange("A:G").getFormat().autofitColumns();
+
+  // Read emails from column D, fill Access column G
+  // @axa.com, @jellyfish.com, @heaviside.fr → Retain, others → blank
+  const emailData: string[][] = sheet.getRange("D2:D" + lastRow)
+    .getValues() as string[][];
+  const accessValues: string[][] = [];
+  for (let i = 0; i < emailData.length; i++) {
+    const email: string = emailData[i][0]
+      ? emailData[i][0].toString().toLowerCase()
+      : "";
+    if (
+      email.indexOf("@axa.com") !== -1 ||
+      email.indexOf("@jellyfish.com") !== -1 ||
+      email.indexOf("@heaviside.fr") !== -1
+    ) {
+      accessValues.push(["Retain"]);
+    } else {
+      accessValues.push([""]);
+    }
+  }
+  sheet.getRange(accessStart + ":" + accessEnd).setValues(accessValues);
+
+  // Dropdown validation on Access column G
+  const accessRange: ExcelScript.Range = sheet.getRange(
+    accessStart + ":" + accessEnd
+  );
+  accessRange.getDataValidation().setRule({
+    list: { inCellDropDown: true, source: "Retain,Delete,New" }
+  });
+
+  // Conditional formatting — Access column ONLY
+  // Retain = Green
+  const retainFmt: ExcelScript.ConditionalFormat =
+    accessRange.addConditionalFormat(ExcelScript.ConditionalFormatType.containsText);
+  retainFmt.getTextComparison().setRule({
+    operator: ExcelScript.ConditionalTextOperator.contains,
+    text: "Retain"
+  });
+  retainFmt.getTextComparison().getFormat().getFill().setColor("#92D050");
+  retainFmt.getTextComparison().getFormat().getFont().setColor("#1A4D00");
+  retainFmt.getTextComparison().getFormat().getFont().setBold(true);
+
+  // Delete = Red
+  const deleteFmt: ExcelScript.ConditionalFormat =
+    accessRange.addConditionalFormat(ExcelScript.ConditionalFormatType.containsText);
+  deleteFmt.getTextComparison().setRule({
+    operator: ExcelScript.ConditionalTextOperator.contains,
+    text: "Delete"
+  });
+  deleteFmt.getTextComparison().getFormat().getFill().setColor("#FF0000");
+  deleteFmt.getTextComparison().getFormat().getFont().setColor("#FFFFFF");
+  deleteFmt.getTextComparison().getFormat().getFont().setBold(true);
+
+  // New = Blue
+  const newFmt: ExcelScript.ConditionalFormat =
+    accessRange.addConditionalFormat(ExcelScript.ConditionalFormatType.containsText);
+  newFmt.getTextComparison().setRule({
+    operator: ExcelScript.ConditionalTextOperator.contains,
+    text: "New"
+  });
+  newFmt.getTextComparison().getFormat().getFill().setColor("#00B0F0");
+  newFmt.getTextComparison().getFormat().getFont().setColor("#FFFFFF");
+  newFmt.getTextComparison().getFormat().getFont().setBold(true);
+
+  // Freeze header row
+  sheet.getFreezePanes().freezeRows(1);
+}
