@@ -6,12 +6,24 @@ function main(workbook: ExcelScript.Workbook) {
   // E=Account Role, F=Container Role
   // G=Access (new column to add)
 
-  // ✅ STEP 1: Remove duplicates based on Account Name (A) + User Email (D)
-  // Same email in same account = duplicate → remove
-  // Same email in different account = keep both
   const totalRows: number = sheet.getUsedRange().getRowCount();
 
-  // Read all account names and emails at once (faster than cell-by-cell)
+  // ✅ STEP 1: Fill down Account Name (column A)
+  // Many rows have blank account name - fill from the last seen value above
+  let lastAccountName: string = "";
+  for (let i = 2; i <= totalRows; i++) {
+    const cellVal = sheet.getRange("A" + i).getValue();
+    const cellStr: string = cellVal ? cellVal.toString().trim() : "";
+    if (cellStr !== "") {
+      lastAccountName = cellStr; // update last seen name
+    } else {
+      sheet.getRange("A" + i).setValue(lastAccountName); // fill blank with last name
+    }
+  }
+
+  // ✅ STEP 2: Remove duplicates based on Account Name (A) + User Email (D)
+  // Same email in same account = duplicate → remove
+  // Same email in different account = keep both
   const accountData: string[][] = sheet.getRange("A2:A" + totalRows)
     .getValues() as string[][];
   const emailData0: string[][] = sheet.getRange("D2:D" + totalRows)
@@ -32,13 +44,13 @@ function main(workbook: ExcelScript.Workbook) {
     const actualRow: number = i + 2;
 
     if (seenKeys.has(key)) {
-      rowsToDelete.push(actualRow); // duplicate within same account
+      rowsToDelete.push(actualRow);
     } else {
-      seenKeys.add(key); // first occurrence, keep
+      seenKeys.add(key);
     }
   }
 
-  // Delete duplicate rows bottom to top so indices stay valid
+  // Delete duplicate rows bottom to top
   for (const rowNum of rowsToDelete) {
     sheet.getRange(rowNum + ":" + rowNum).delete(ExcelScript.DeleteShiftDirection.up);
   }
