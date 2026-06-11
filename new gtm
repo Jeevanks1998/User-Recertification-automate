@@ -7,26 +7,38 @@ function main(workbook: ExcelScript.Workbook) {
   // G=Access (new column to add)
 
   // ✅ STEP 1: Remove duplicates based on Account Name (A) + User Email (D)
-  // Same person appearing multiple times in the same account = duplicate
-  // Different accounts = keep both rows
+  // Same email in same account = duplicate → remove
+  // Same email in different account = keep both
   const totalRows: number = sheet.getUsedRange().getRowCount();
+
+  // Read all account names and emails at once (faster than cell-by-cell)
+  const accountData: string[][] = sheet.getRange("A2:A" + totalRows)
+    .getValues() as string[][];
+  const emailData0: string[][] = sheet.getRange("D2:D" + totalRows)
+    .getValues() as string[][];
+
   const seenKeys: Set<string> = new Set<string>();
   const rowsToDelete: number[] = [];
 
-  for (let i = totalRows; i >= 2; i--) {
-    const accountVal = sheet.getRange("A" + i).getValue();
-    const emailVal = sheet.getRange("D" + i).getValue();
-    const account: string = accountVal ? accountVal.toString().toLowerCase().trim() : "";
-    const email: string = emailVal ? emailVal.toString().toLowerCase().trim() : "";
-    const key: string = account + "|" + email; // unique combo: Account + Email
+  // Scan bottom to top so first occurrence (top) is always kept
+  for (let i = accountData.length - 1; i >= 0; i--) {
+    const account: string = accountData[i][0]
+      ? accountData[i][0].toString().toLowerCase().trim()
+      : "";
+    const email: string = emailData0[i][0]
+      ? emailData0[i][0].toString().toLowerCase().trim()
+      : "";
+    const key: string = account + "|" + email;
+    const actualRow: number = i + 2;
+
     if (seenKeys.has(key)) {
-      rowsToDelete.push(i); // mark as duplicate
+      rowsToDelete.push(actualRow); // duplicate within same account
     } else {
-      seenKeys.add(key); // first occurrence, keep it
+      seenKeys.add(key); // first occurrence, keep
     }
   }
 
-  // Delete duplicate rows (reverse order keeps indices valid)
+  // Delete duplicate rows bottom to top so indices stay valid
   for (const rowNum of rowsToDelete) {
     sheet.getRange(rowNum + ":" + rowNum).delete(ExcelScript.DeleteShiftDirection.up);
   }
@@ -80,7 +92,6 @@ function main(workbook: ExcelScript.Workbook) {
   sheet.getRange("A:G").getFormat().autofitColumns();
 
   // Read emails from column D, fill Access column G
-  // @axa.com, @jellyfish.com, @heaviside.fr → Retain, others → blank
   const emailData: string[][] = sheet.getRange("D2:D" + lastRow)
     .getValues() as string[][];
   const accessValues: string[][] = [];
